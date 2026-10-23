@@ -70,7 +70,8 @@ $(function() {
                 },
                 { id: "rename", text: _("Rename"), icon: "link", enabled: "one", perm: "ard", 
                     click: async function() { 
-                        $("#newname").val(tableform.table_selected_row(table).NAME);
+                        let selectedrow = tableform.table_selected_row(table);
+                        $("#newname").val(selectedrow.PATH + "/" + selectedrow.NAME);
                         await tableform.show_okcancel_dialog("#dialog-rename", _("Rename"), { width: 550, notblank: [ "newname" ] });
                         let row = tableform.table_selected_row(table);
                         let oldname = encodeURIComponent(row.NAME);
@@ -145,7 +146,7 @@ $(function() {
             return [
                 '<div id="dialog-rename" style="display: none" title="' + html.title(_("Rename")) + '">',
                 tableform.fields_render([
-                    { post_field: "newname", type: "text", label: _("New name"), doublesize: true }
+                    { post_field: "newname", type: "text", label: _("New path/name"), doublesize: true }
                 ]),
                 '</div>'
             ].join("\n");

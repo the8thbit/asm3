@@ -52,11 +52,40 @@ class TestDBFS(unittest.TestCase):
         self.assertEqual(b"content", asm3.dbfs.get_string_filepath(base.get_dbo(), "/document_repository/testrenamed.txt"))
         asm3.dbfs.delete_filepath(base.get_dbo(), "/document_repository/testrenamed.txt")
 
+    def test_move_document_repository(self):
+        asm3.dbfs.upload_document_repository(base.get_dbo(), "", "testmove.txt", b"content")
+        asm3.dbfs.rename_document_repository(base.get_dbo(), "/document_repository", "testmove.txt", "training/testmoved.txt")
+        self.assertFalse(asm3.dbfs.file_exists(base.get_dbo(), "testmove.txt", "/document_repository"))
+        self.assertEqual(b"content", asm3.dbfs.get_string_filepath(base.get_dbo(), "/document_repository/training/testmoved.txt"))
+        asm3.dbfs.delete_filepath(base.get_dbo(), "/document_repository/training/testmoved.txt")
+
+    def test_move_document_repository_to_root(self):
+        asm3.dbfs.upload_document_repository(base.get_dbo(), "training", "testroot.txt", b"content")
+        asm3.dbfs.rename_document_repository(base.get_dbo(), "/document_repository/training", "testroot.txt", "/document_repository/testrootmoved.txt")
+        self.assertFalse(asm3.dbfs.file_exists(base.get_dbo(), "testroot.txt", "/document_repository/training"))
+        self.assertEqual(b"content", asm3.dbfs.get_string_filepath(base.get_dbo(), "/document_repository/testrootmoved.txt"))
+        asm3.dbfs.delete_filepath(base.get_dbo(), "/document_repository/testrootmoved.txt")
+
+    def test_move_document_repository_existing_destination(self):
+        asm3.dbfs.upload_document_repository(base.get_dbo(), "", "testsource.txt", b"source")
+        asm3.dbfs.upload_document_repository(base.get_dbo(), "training", "testdestination.txt", b"destination")
+        with self.assertRaises(asm3.utils.ASMValidationError):
+            asm3.dbfs.rename_document_repository(base.get_dbo(), "/document_repository", "testsource.txt", "training/testdestination.txt")
+        self.assertEqual(b"source", asm3.dbfs.get_string_filepath(base.get_dbo(), "/document_repository/testsource.txt"))
+        self.assertEqual(b"destination", asm3.dbfs.get_string_filepath(base.get_dbo(), "/document_repository/training/testdestination.txt"))
+        asm3.dbfs.delete_filepath(base.get_dbo(), "/document_repository/testsource.txt")
+        asm3.dbfs.delete_filepath(base.get_dbo(), "/document_repository/training/testdestination.txt")
+
     def test_rename_document_repository_outside_path(self):
         with self.assertRaises(asm3.utils.ASMValidationError):
             asm3.dbfs.rename_document_repository(base.get_dbo(), "/reports", "nopic.jpg", "renamed.jpg")
         with self.assertRaises(asm3.utils.ASMValidationError):
             asm3.dbfs.rename_document_repository(base.get_dbo(), "/document_repositoryx", "nopic.jpg", "renamed.jpg")
+        asm3.dbfs.upload_document_repository(base.get_dbo(), "", "testescape.txt", b"content")
+        with self.assertRaises(asm3.utils.ASMValidationError):
+            asm3.dbfs.rename_document_repository(base.get_dbo(), "/document_repository", "testescape.txt", "../reports/escaped.txt")
+        self.assertEqual(b"content", asm3.dbfs.get_string_filepath(base.get_dbo(), "/document_repository/testescape.txt"))
+        asm3.dbfs.delete_filepath(base.get_dbo(), "/document_repository/testescape.txt")
         self.assertNotEqual(0, len(asm3.dbfs.get_string_filepath(base.get_dbo(), "/reports/nopic.jpg")))
 
     def test_get_report_images(self):

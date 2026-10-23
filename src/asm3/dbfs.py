@@ -360,19 +360,46 @@ def rename_file(dbo: Database, path: str, oldname: str, newname: str) -> None:
 
 def rename_document_repository(dbo: Database, path: str, oldname: str, newname: str) -> None:
     """
-    Renames a file in the document repository. Refuses paths outside
+    Renames or moves a file in the document repository. Refuses paths outside
     /document_repository so the endpoint cannot be used to rename other
     dbfs files (eg: /reports images).
     """
     if path != "/document_repository" and not path.startswith("/document_repository/"):
         raise asm3.utils.ASMValidationError("rename_document_repository: invalid path '%s'" % path)
-    rename_file(dbo, path, oldname, newname)
+    dbfsid = dbo.query_int("SELECT ID FROM dbfs WHERE Name = ? AND Path = ?", (oldname, path))
+    if dbfsid == 0:
+        raise DBFSError("No document repository item found for path=%s, name=%s" % (path, oldname))
+    newname = newname.replace("\\", "/")
+    newpath = path
+    newfilename = newname
+    if "/" in newname:
+        if not newname.startswith("/"):
+            newname = "/document_repository/%s" % newname
+        newname = os.path.normpath(newname)
+        newpath = newname[0:newname.rfind("/")]
+        if newpath != "/document_repository" and not newpath.startswith("/document_repository/"):
+            raise asm3.utils.ASMValidationError("rename_document_repository: invalid path '%s'" % newpath)
+        newfilename = asm3.utils.filename_only(newname)
+        if newfilename == "":
+            raise asm3.utils.ASMValidationError("rename_document_repository: filename cannot be blank")
+        if newpath != "/document_repository":
+            newpath = "/document_repository/%s" % sanitise_path(newpath[len("/document_repository/"):])
+        newname = "%s/%s" % (newpath, newfilename)
+    existingid = dbo.query_int("SELECT ID FROM dbfs WHERE Name = ? AND Path = ?", (newfilename, newpath))
+    if existingid != 0 and existingid != dbfsid:
+        raise asm3.utils.ASMValidationError("rename_document_repository: destination already exists")
+    rename_file_id(dbo, dbfsid, newname)
 
 def rename_file_id(dbo: Database, dbfsid: int, newname: str) -> None:
     """
-    Renames a file in the dbfs.
+    Renames a file in the dbfs. If newname includes a path, moves the file too.
     """
-    dbo.execute("UPDATE dbfs SET Name = ? WHERE ID = ?", (newname, dbfsid))
+    if "/" in newname:
+        name = newname[newname.rfind("/")+1:]
+        path = newname[0:newname.rfind("/")]
+        dbo.execute("UPDATE dbfs SET Name = ?, Path = ? WHERE ID = ?", (name, path, dbfsid))
+    else:
+        dbo.execute("UPDATE dbfs SET Name = ? WHERE ID = ?", (newname, dbfsid))
 
 def put_file(dbo: Database, name: str, path: str, filepath: str) -> int:
     """
